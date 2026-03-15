@@ -50,11 +50,15 @@ public class UserController {
     }
     @PostMapping(value = "/register")
     public ResponseEntity<ResponseDTO> registerUser(@RequestBody @Valid UserDTO userDTO) {
-        System.out.println("register");
-        System.out.println(userDTO.getEmail());
-        System.out.println(userDTO.getName());
-        System.out.println(userDTO.getRole());
         try {
+            Date joinDate = Date.valueOf(LocalDate.now());
+            userDTO.setJoinDate(joinDate);
+
+            //values are change
+            userDTO.setVerificationCode(null);
+            userDTO.setVerified(true);
+
+
             int res = userService.saveUser(userDTO);
             switch (res) {
                 case VarList.Created -> {
@@ -65,7 +69,7 @@ public class UserController {
                     return ResponseEntity.status(HttpStatus.CREATED)
                             .body(new ResponseDTO(VarList.Created, "Success", authDTO));
                 }
-                case VarList.Not_Acceptable -> {
+                case VarList.All_Ready_Added -> {
                     return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
                             .body(new ResponseDTO(VarList.Not_Acceptable, "Email Already Used", null));
                 }

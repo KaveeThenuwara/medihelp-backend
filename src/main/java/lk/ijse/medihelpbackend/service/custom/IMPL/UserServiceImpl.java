@@ -6,6 +6,7 @@ import lk.ijse.medihelpbackend.Entity.User;
 import lk.ijse.medihelpbackend.dto.UserDTO;
 import lk.ijse.medihelpbackend.repo.UserRepository;
 import lk.ijse.medihelpbackend.service.custom.UserService;
+import lk.ijse.medihelpbackend.util.VarList;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,8 +58,18 @@ public class UserServiceImpl implements UserDetailsService, UserService {
 
     @Override
     public int saveUser(UserDTO userDTO) {
-        System.out.println("Save user  "+  userDTO.getEmail());
-        return 0;
+        System.out.println("user save detail come from controller");
+        if(userRepository.existsByEmail(userDTO.getEmail())) {
+            return VarList.All_Ready_Added;
+        }
+        //password hash
+        String password = userDTO.getPassword();
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        String encodedPassword = encoder.encode(password);
+        userDTO.setPassword(encodedPassword);
+        User user = modelMapper.map(userDTO, User.class);
+        userRepository.save(user);
+        return VarList.Created;
     }
 
     @Override
