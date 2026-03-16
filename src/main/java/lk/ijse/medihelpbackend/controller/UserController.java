@@ -4,84 +4,114 @@ import jakarta.validation.Valid;
 import lk.ijse.medihelpbackend.dto.AuthDTO;
 import lk.ijse.medihelpbackend.dto.ResponseDTO;
 import lk.ijse.medihelpbackend.dto.UserDTO;
-import lk.ijse.medihelpbackend.repo.UserRepository;
 import lk.ijse.medihelpbackend.service.custom.UserService;
 import lk.ijse.medihelpbackend.util.JwtUtil;
 import lk.ijse.medihelpbackend.util.VarList;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.sql.Date;
-import java.time.LocalDate;
+import lk.ijse.medihelpbackend.service.custom.EmailService;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("api/v1/user")
 @CrossOrigin
 public class UserController {
+
     private final UserService userService;
-    private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private EmailService emailService;
 
-    //constructor injection
-    public UserController(UserService userService, UserRepository userRepository, JwtUtil jwtUtil) {
+    public UserController(UserService userService, JwtUtil jwtUtil) {
         this.userService = userService;
-        this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
     }
 
-    @GetMapping("/test")
-    public String test() {
-        System.out.println("test");
-        return "test";
-    }
     @PostMapping(value = "/register")
     public ResponseEntity<ResponseDTO> registerUser(@RequestBody @Valid UserDTO userDTO) {
         try {
-            Date joinDate = Date.valueOf(LocalDate.now());
-            userDTO.setJoinDate(joinDate);
-
-            //values are change
-            userDTO.setVerificationCode(null);
-            userDTO.setVerified(true);
-
-
             int res = userService.saveUser(userDTO);
-            switch (res) {
-                case VarList.Created -> {
-                    String token = jwtUtil.generateToken(userDTO);
-                    AuthDTO authDTO = new AuthDTO();
-                    authDTO.setEmail(userDTO.getEmail());
-                    authDTO.setToken(token);
-                    return ResponseEntity.status(HttpStatus.CREATED)
-                            .body(new ResponseDTO(VarList.Created, "Success", authDTO));
-                }
-                case VarList.All_Ready_Added -> {
-                    return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
-                            .body(new ResponseDTO(VarList.Not_Acceptable, "Email Already Used", null));
-                }
-                default -> {
-                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                            .body(new ResponseDTO(VarList.Bad_Gateway, "Error", null));
-                }
+            if (res == VarList.Created) {
+                String token = jwtUtil.generateToken(userDTO);
+                AuthDTO authDTO = new AuthDTO();
+                authDTO.setEmail(userDTO.getEmail());
+                authDTO.setToken(token);
+                authDTO.setRole(userDTO.getRole());
+                // Send welcome email
+                try { emailService.sendWelcomeEmail(userDTO.getEmail(), userDTO.getName() != null ? userDTO.getName() : "there"); } catch (Exception ignored) {}
+                return new ResponseEntity<>(new ResponseDTO(VarList.Created, "User registered successfully", authDTO), HttpStatus.CREATED);
+            } else if (res == VarList.Not_Acceptable) {
+                return new ResponseEntity<>(new ResponseDTO(VarList.Not_Acceptable, "Email already used", null), HttpStatus.NOT_ACCEPTABLE);
+            } else {
+                return new ResponseEntity<>(new ResponseDTO(VarList.Bad_Gateway, "Internal Error", null), HttpStatus.BAD_GATEWAY);
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null));
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
+    @PutMapping("/update")
+    public ResponseEntity<ResponseDTO> updateUser(@RequestBody UserDTO userDTO) {
+        try {
+            int res = userService.updateUser(userDTO);
+            if (res == VarList.OK) {
+                return new ResponseEntity<>(new ResponseDTO(VarList.OK, "User updated successfully", null), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(new ResponseDTO(VarList.Not_Found, "User not found", null), HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @DeleteMapping("/delete/{email}")
+    public ResponseEntity<ResponseDTO> deleteUser(@PathVariable String email) {
+        try {
+            int res = userService.deleteUser(email);
+            if (res == VarList.OK) {
+                return new ResponseEntity<>(new ResponseDTO(VarList.OK, "User deleted successfully", null), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(new ResponseDTO(VarList.Not_Found, "User not found", null), HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/search/{email}")
+    public ResponseEntity<ResponseDTO> searchUser(@PathVariable String email) {
+        try {
+            UserDTO userDTO = userService.searchUser(email);
+            if (userDTO != null) {
+                return new ResponseEntity<>(new ResponseDTO(VarList.OK, "User found", userDTO), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(new ResponseDTO(VarList.Not_Found, "User not found", null), HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<ResponseDTO> getAllUsers() {
+        try {
+            List<UserDTO> users = userService.getAllUsers();
+            return new ResponseEntity<>(new ResponseDTO(VarList.OK, "All users fetched", users), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/role/{role}")
+    public ResponseEntity<ResponseDTO> getUsersByRole(@PathVariable String role) {
+        try {
+            List<UserDTO> users = userService.getUsersByRole(role);
+            return new ResponseEntity<>(new ResponseDTO(VarList.OK, "Users by role fetched", users), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ResponseDTO(VarList.Internal_Server_Error, e.getMessage(), null), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+}

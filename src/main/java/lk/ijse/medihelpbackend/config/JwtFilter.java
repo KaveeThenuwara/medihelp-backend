@@ -2,15 +2,13 @@ package lk.ijse.medihelpbackend.config;
 
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lk.ijse.medihelpbackend.service.custom.IMPL.UserServiceImpl;
+import lk.ijse.medihelpbackend.service.custom.impl.UserServiceImpl;
 import lk.ijse.medihelpbackend.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,8 +24,6 @@ public class JwtFilter extends OncePerRequestFilter {
     private JwtUtil jwtUtil;
     @Autowired
     private UserServiceImpl userService;
-    @Value("${jwt.secret}")
-    private String secretKey;
 
     @Override
     protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws ServletException, IOException {
@@ -38,10 +34,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
 
         if (null != authorization && authorization.startsWith("Bearer ")) {
-            System.out.println("methnin kadunaaa");
             token = authorization.substring(7);
             email = jwtUtil.getUsernameFromToken(token);
-            Claims claims=jwtUtil.getUserRoleCodeFromToken(token);
+            Claims claims = jwtUtil.getUserRoleCodeFromToken(token);
             httpServletRequest.setAttribute("email", email);
             httpServletRequest.setAttribute("role", claims.get("role"));
         }
@@ -66,8 +61,6 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 
-    private Claims getClaimsFromJwtToken(String token) {
-        return Jwts.parser().setSigningKey(secretKey.getBytes()).parseClaimsJws(token).getBody();
-    }
+    // deleted getClaimsFromJwtToken method
 
 }
