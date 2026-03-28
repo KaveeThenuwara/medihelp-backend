@@ -17,7 +17,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("api/v1/admin")
 @PreAuthorize("hasAuthority('ADMIN')")
-public class AdminController {
+public class  AdminController {
 
     private final UserService userService;
     private final AppointmentService appointmentService;

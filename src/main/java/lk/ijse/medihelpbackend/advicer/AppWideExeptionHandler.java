@@ -12,3 +12,4 @@ public class AppWideExeptionHandler {
         return new ResponseDTO(500, "Internal Server Error", e.getMessage());
     }
 }
+                                                                        
